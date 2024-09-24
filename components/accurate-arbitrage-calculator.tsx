@@ -10,52 +10,56 @@ export function Calculator() {
   const [odds1, setOdds1] = useState(2.5)
   const [odds2, setOdds2] = useState(2.0)
   const [profit, setProfit] = useState(10)
-  const [confidence, setConfidence] = useState(50)
+  const [weight, setWeight] = useState(50)
   const [result, setResult] = useState({ stake1: 0, stake2: 0, totalStake: 0, roi: 0, profit1: 0, profit2: 0 })
   const [isValidArb, setIsValidArb] = useState(true)
 
-  const calculateArbitrage = (odds1: number, odds2: number, profit: number, confidence: number) => {
+  const calculateArbitrage = (odds1: number, odds2: number, targetProfit: number, weight: number) => {
     const impliedProbability = (1 / odds1) + (1 / odds2);
   
     if (impliedProbability >= 1) {
-      // Not a valid arbitrage opportunity
+      setIsValidArb(false);
       return { stake1: 0, stake2: 0, totalStake: 0, roi: 0, profit1: 0, profit2: 0 };
     }
-  
-    const confidenceRatio = confidence / 100;
-  
-    // Total profit target we want to achieve
-    const totalProfit = profit;
-  
-    // Initial guess for stake2 and tolerance for convergence
-    let stake1 = 0; // Initialize stake1 to 0 to avoid undefined
-    let stake2 = profit; // Initial guess for stake2
-    const tolerance = 0.00; // Tolerance for the iterative difference
+
+    setIsValidArb(true);
+
+    // Adjust target profits based on weight
+    let targetProfit1 = targetProfit;
+    let targetProfit2 = targetProfit;
+
+    if (weight < 50) {
+      targetProfit2 = targetProfit * (weight / 50);
+    } else if (weight > 50) {
+      targetProfit1 = targetProfit * ((100 - weight) / 50);
+    }
+
+    // Initial guess for stakes
+    let stake1 = targetProfit1 / (odds1 - 1);
+    let stake2 = targetProfit2 / (odds2 - 1);
+
+    const tolerance = 0.00;
     let difference = Infinity;
-  
+
     // Iterative process to calculate correct stake1 and stake2
     while (Math.abs(difference) > tolerance) {
-      // Step 1: Calculate stake1 based on stake2
-      stake1 = (profit + stake2) / (odds1 - 1);
-  
-      // Step 2: Calculate new stake2 based on stake1
-      const newStake2 = (profit + stake1) / (odds2 - 1);
-  
-      // Update difference between old and new stake2
-      difference = newStake2 - stake2;
-  
-      // Update stake2 for the next iteration
+      // Calculate new stakes based on the weighted target profits
+      const newStake1 = (targetProfit1 + stake2) / (odds1 - 1);
+      const newStake2 = (targetProfit2 + stake1) / (odds2 - 1);
+
+      // Update difference
+      difference = (newStake1 - stake1) + (newStake2 - stake2);
+
+      // Update stakes for next iteration
+      stake1 = newStake1;
       stake2 = newStake2;
     }
-  
-    // Calculate the total stake and ROI
+
     const totalStake = stake1 + stake2;
-    const roi = (totalProfit / totalStake) * 100;
-  
-    // Profit for both cases (corrected calculation)
     const profit1 = stake1 * odds1 - totalStake;
     const profit2 = stake2 * odds2 - totalStake;
-  
+    const roi = ((profit1 + profit2) / 2 / totalStake) * 100;
+
     return {
       stake1,
       stake2,
@@ -67,8 +71,8 @@ export function Calculator() {
   };
   
   useEffect(() => {
-    setResult(calculateArbitrage(odds1, odds2, profit, confidence))
-  }, [odds1, odds2, profit, confidence])
+    setResult(calculateArbitrage(odds1, odds2, profit, weight))
+  }, [odds1, odds2, profit, weight])
 
   const inputClasses = `w-full text-sm bg-gray-800 border-gray-700 text-white focus:ring-gray-700 focus:border-gray-600`
 
@@ -128,18 +132,18 @@ export function Calculator() {
           </div>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <Label htmlFor="confidence" className="text-sm font-medium text-gray-300">
-                confidence (odds 1 / odds 2)
+              <Label htmlFor="weight" className="text-sm font-medium text-gray-300">
+                weight (odds 1 / odds 2)
               </Label>
-              <span className="text-sm font-semibold text-white">{100 - confidence}% / {confidence}%</span>
+              <span className="text-sm font-semibold text-white">{100 - weight}% / {weight}%</span>
             </div>
             <Slider
-              id="confidence"
+              id="weight"
               min={0}
               max={100}
               step={1}
-              value={[confidence]}
-              onValueChange={(value) => setConfidence(value[0])}
+              value={[weight]}
+              onValueChange={(value) => setWeight(value[0])}
               className="w-full"
             />
           </div>
